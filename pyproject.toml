@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wmpf-mcp"
+version = "0.1.0"
+description = "MCP toolkit driving AI-assisted interaction and security assessment of WeChat MiniProgram (WMPF) runtimes."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-2.0-only"
+license-files = ["LICENSE"]
+authors = [
+  { name = "helGayhub233" },
+]
+keywords = ["mcp", "wechat", "miniprogram", "wmpf", "frida", "cdp", "security"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+]
+dependencies = [
+  "aiohttp>=3.9",
+  "jsbeautifier>=1.14",
+  "mcp>=2.3.0,<3",
+  "pycryptodome>=3.19",
+]
+
+[project.optional-dependencies]
+extract = ["capstone>=5.0.0", "numpy>=1.26"]
+dynamic = ["frida>=17.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/helGayhub233/WMPF-MCP"
+Repository = "https://github.com/helGayhub233/WMPF-MCP"
+Issues = "https://github.com/helGayhub233/WMPF-MCP/issues"
+
+[project.scripts]
+wmpf-mcp = "wmpf_mcp.bootstrap:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wmpf_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/README.md",
+  "/LICENSE",
+  "/CHANGELOG.md",
+  "/glama.json",
+  "/mcp.json.example",
+  "/pyproject.toml",
+  "/scripts/audit_mcp_contracts.py",
+  "/src",
+  "/tests",
+]
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

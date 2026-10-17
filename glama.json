@@ -1,0 +1,9 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "maintainers": ["helGayhub233"],
+  "displayName": "WMPF-MCP",
+  "description": "MCP toolkit driving AI-assisted interaction and security assessment of WeChat MiniPrograms under the PC WMPF runtime: runtime discovery, offset resolution, Frida injection, a browser-level CDP portal for agent-browser, traffic capture and cached-package decompilation.",
+  "websiteUrl": "https://github.com/helGayhub233/WMPF-MCP",
+  "categories": ["Developer Tools", "Security"],
+  "tags": ["mcp", "wechat", "miniprogram", "wmpf", "frida", "cdp", "security", "python"]
+}

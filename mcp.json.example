@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "wmpf-mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/absolute/path/to/WMPF-MCP",
+        "run",
+        "wmpf-mcp"
+      ],
+      "env": {
+        "WMPF_MCP_WECHAT_APP": "/Applications/WeChat.app",
+        "WMPF_MCP_CDP_PORT": "10000",
+        "WMPF_MCP_PORTAL_PORT": "20000"
+      }
+    }
+  }
+}

@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+
+# Test / coverage / lint caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+coverage.xml
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local secrets and runtime config
+.env
+.env.*
+!.env.example
+mcp.json
+
+# IDE / editor / local agent config
+.vscode/
+.idea/
+.claude/
+.cursor/
+.qoder/
+*.swp
+*.swo
+*~
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Local-only material (not part of the published package)
+/README.md
+/docs/
+/tmp/
+/scratch/
+*.har
+
+# Logs / temp / local scratch
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej
