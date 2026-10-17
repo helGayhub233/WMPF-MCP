@@ -37,6 +37,10 @@ def _header_size(text: str | None) -> int:
 def _sizes(e: Transaction) -> tuple[int, int]:
     if e.method.upper() == "HEAD" or e.status in (204, 304):
         return 0, 0
+    # Redirect closure is not loadingFinished for this hop. Headers or a
+    # partial dataReceived chunk do not establish its complete entity size.
+    if e.redirected:
+        return -1, -1
     # loadingFinished is the entire transfer; never call it entity size.
     encoded = decoded = -1
     if e.finished_at is not None:

@@ -41,8 +41,15 @@
   };
   const check = () => {
     if (document.readyState === 'loading') return;
+    let candidates;
     try {
-      const candidates = [...document.querySelectorAll(selector)];
+      candidates = [...document.querySelectorAll(selector)];
+    } catch (error) {
+      finish({ ready: false, reason: error?.name === 'SyntaxError' ? 'invalid_selector' : 'observer_error',
+        error: String(error) });
+      return;
+    }
+    try {
       for (const element of candidates) resize?.observe(element);
       const matches = candidates.filter(visible);
       const images = matches.flatMap(el => el.tagName === 'IMG' ? [el] : [...(el.querySelectorAll?.('img') || [])]);
@@ -59,7 +66,7 @@
       if (matches.length && !last.pending_images && !last.fonts_loading)
         finish({ ready: true, selector, ...last, document_state: document.readyState });
     } catch (error) {
-      finish({ ready: false, reason: 'invalid_selector', error: String(error) });
+      finish({ ready: false, reason: 'observer_error', error: String(error) });
     }
   };
   Object.defineProperty(globalThis, key, { configurable: true,

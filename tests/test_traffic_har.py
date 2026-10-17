@@ -89,6 +89,41 @@ async def test_redirect_extra_info_out_of_order_keeps_hop_identity_and_body():
     assert engine.calls == [("Network.getResponseBody", {"requestId": "r"})]
 
 
+@pytest.mark.anyio
+@pytest.mark.parametrize("method", ["POST", "HEAD"])
+@pytest.mark.parametrize("evidence", ["headers_only_transfer", "content_length", "partial_chunk"])
+async def test_redirect_entity_sizes_require_independent_body_completion(method, evidence):
+    book = ledger()
+    request(book, method=method)
+    fields = {"Content-Length": "104", "Location": "/final"}
+    header_text = "HTTP/1.1 307 Temporary Redirect\r\nContent-Length: 104\r\nLocation: /final\r\n\r\n"
+    if evidence == "headers_only_transfer":
+        emit(book, "responseReceivedExtraInfo", statusCode=307, headers=fields, headersText=header_text)
+    if evidence == "partial_chunk":
+        emit(book, "dataReceived", dataLength=23, encodedDataLength=17)
+    emit(book, "requestWillBeSent", timestamp=2, wallTime=1710000001,
+         redirectResponse={"status": 307, "statusText": "Temporary Redirect", "headers": fields,
+                           "encodedDataLength": len(header_text) if evidence == "headers_only_transfer" else 0},
+         redirectHasExtraInfo=evidence == "headers_only_transfer",
+         request={"method": method, "url": "http://fixture/final", "headers": {}})
+    response(book)
+    finish(book)
+    engine = Engine()
+    rows = (await har.export_har(book, engine, live=True))["har"]["log"]["entries"]
+    first, final = rows
+    expected = 0 if method == "HEAD" else -1
+    assert first["response"]["bodySize"] == first["response"]["content"]["size"] == expected
+    assert {h["name"]: h["value"] for h in first["response"]["headers"]}["Content-Length"] == "104"
+    if method == "HEAD":
+        assert first["response"]["content"]["text"] == ""
+        assert not engine.calls
+    else:
+        assert "text" not in first["response"]["content"]
+        assert "Redirect" in first["_wmpf"]["responseBodyError"]
+        assert final["response"]["content"]["text"] == "hello"
+        assert engine.calls == [("Network.getResponseBody", {"requestId": "r"})]
+
+
 def test_extra_info_skips_hops_that_explicitly_emit_none():
     book = ledger()
     request(book)

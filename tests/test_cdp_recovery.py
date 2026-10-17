@@ -184,7 +184,7 @@ def test_hook_captures_large_frames_and_suppresses_only_captured_maps():
         pytest.skip("Node is needed to execute the Frida template harness")
     import subprocess
 
-    source = TEMPLATE_PATH.read_text().replace(
+    source = TEMPLATE_PATH.read_text(encoding="utf-8").replace(
         "@@CONFIG@@", json.dumps({"Version": 25800, "Arch": {"arm64": {
             "LoadStartHookOffset": "0x200", "CDPFilterHookOffset": "0x100"}}})
     )

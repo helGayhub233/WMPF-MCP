@@ -325,6 +325,10 @@ class PortalService:
                 elif method == "Target.getTargets":
                     self._reply(ws, message_id, {
                         "targetInfos": [self._target_json(t) for t in self.targets()]}, session_id)
+                elif method == "Target.createTarget":
+                    self._error(ws, message_id, -32000,
+                        "Target.createTarget is unavailable: Portal wraps one existing MiniProgram runtime. "
+                        "Use Target.getTargets and attach to its existing webview; no independent tab was created.", session_id)
                 else:
                     self._error(ws, message_id, -32601, f"Unsupported browser-session method: {method}", session_id)
                 return
