@@ -37,8 +37,9 @@ def _wechat_app_default() -> Path:
     if sys.platform == "darwin":
         return Path("/Applications/WeChat.app")
     if sys.platform == "win32":
-        appdata = Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
-        return appdata / "Tencent" / "xwechat"
+        program_files = Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+        candidates = [program_files / "Tencent" / name for name in ("Weixin", "WeChat")]
+        return next((path for path in candidates if path.is_dir()), candidates[0])
     return Path.home() / ".xwechat"
 
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
 import random
 import time
 from collections import OrderedDict, deque
@@ -39,6 +40,19 @@ class EngineError(RuntimeError):
 
 class MiniappTimeoutError(TimeoutError):
     """No (setup-context-complete) miniapp connection within the deadline."""
+
+
+def _fingerprint_data(value: Any) -> Any:
+    """Match integral JSON/CBOR numbers without changing delivered payloads."""
+    if isinstance(value, dict):
+        return {key: _fingerprint_data(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_fingerprint_data(item) for item in value]
+    if type(value) is float and math.isfinite(value) and value.is_integer():
+        if value == 0.0 and math.copysign(1.0, value) < 0:
+            return value
+        return int(value)
+    return value
 
 
 class DebugEngine:
@@ -235,7 +249,7 @@ class DebugEngine:
         # only a matching copy from another source; repeated events on the
         # same source are legitimate. Keep memory bounded even for screenshots.
         fingerprint = hashlib.sha256(
-            json.dumps(data, sort_keys=True, separators=(",", ":")).encode()
+            json.dumps(_fingerprint_data(data), sort_keys=True, separators=(",", ":")).encode()
         ).digest()
         now = time.monotonic()
         previous = self._recent_payloads.get(fingerprint)

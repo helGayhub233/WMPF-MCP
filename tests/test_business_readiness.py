@@ -14,7 +14,7 @@ import anyio
 from mcp.server.mcpserver.exceptions import ToolError as MCPToolError
 import pytest
 
-from wmpf_mcp.portal.readiness import probe_page, _SCRIPT
+from wmpf_mcp.portal.readiness import probe_page, _SCRIPT, _WORLD_NAME
 from wmpf_mcp.portal.probe import probe_portal
 from wmpf_mcp.server import build_server, INSTRUCTIONS
 from wmpf_mcp.tools import runtime
@@ -29,8 +29,13 @@ async def portal_fixture():
     observers = []
     sockets = []
     received = []
+    packets = []
+    worlds = []
     closed = asyncio.Event()
-    state = SimpleNamespace(invalid=False, disconnect=False, matched=False, reset=False, drop_cleanup=False, isolated_first=False)
+    state = SimpleNamespace(invalid=False, disconnect=False, matched=False, reset=False, drop_cleanup=False,
+                            isolated_first=False, observer_error=False, root_dom=False, world_generation=0,
+                            destroy_during_observe=False,
+                            capabilities={"dom": True, "eval": True, "wx": False})
     async def discover(request):
         return web.json_response({"webSocketDebuggerUrl": f"ws://127.0.0.1:{request.url.port}/browser"})
     async def ws_handler(request):
@@ -39,13 +44,22 @@ async def portal_fixture():
         sockets.append(ws)
         tasks = []
         bindings = {}
-        async def signal_ready(name):
+        async def signal_ready(name, context_id):
             await release.wait()
             if state.reset:
+                mode = state.reset
                 state.reset = False
-                await ws.send_json({"method": "Runtime.executionContextsCleared", "params": {}, "sessionId": "owned"})
+                state.world_generation += 1
+                if mode == "destroy":
+                    await ws.send_json({"method": "Runtime.executionContextDestroyed", "sessionId": "owned",
+                        "params": {"executionContextId": context_id}})
+                elif mode == "navigate":
+                    await ws.send_json({"method": "Page.frameNavigated", "sessionId": "owned",
+                        "params": {"frame": {"id": "render", "name": "page-frame_100"}}})
+                else:
+                    await ws.send_json({"method": "Runtime.executionContextsCleared", "params": {}, "sessionId": "owned"})
                 await ws.send_json({"method": "Runtime.bindingCalled", "sessionId": "owned",
-                    "params": {"name": name, "executionContextId": 2, "payload": json.dumps({"ready": True})}})
+                    "params": {"name": name, "executionContextId": context_id, "payload": json.dumps({"ready": True})}})
                 await ws.send_json({"method": "Runtime.executionContextCreated", "sessionId": "owned",
                     "params": {"context": {"id": 2, "uniqueId": "new-context",
                         "auxData": {"frameId": "render", "isDefault": True}}}})
@@ -56,14 +70,17 @@ async def portal_fixture():
             state.matched = True
             payload = ({"ready": False, "reason": "invalid_selector", "error": "test invalid CSS"}
                        if state.invalid else {"ready": True, "visible_matches": 1, "document_state": "complete"})
+            if state.observer_error or context_id == 19:
+                payload = {"ready": False, "reason": "observer_error", "error": "TypeError: geometry unavailable"}
             await ws.send_json({"method": "Runtime.bindingCalled", "sessionId": "owned",
-                               "params": {"name": name, "executionContextId": 2, "payload": json.dumps(payload)}})
+                               "params": {"name": name, "executionContextId": context_id, "payload": json.dumps(payload)}})
         try:
             async for message in ws:
                 if message.type != WSMsgType.TEXT: break
                 packet = message.json()
                 method, params = packet["method"], packet.get("params", {})
                 received.append(method)
+                packets.append(packet)
                 result = {}
                 if method == "Target.getTargets":
                     result = {"targetInfos": [{"targetId": "page", "type": "page"}]}
@@ -80,6 +97,14 @@ async def portal_fixture():
                                     "auxData": {"frameId": "render", "isDefault": False}}}})
                     await ws.send_json({"method": "Runtime.executionContextCreated", "sessionId": "owned",
                         "params": {"context": {"id": 2, "auxData": {"frameId": "render", "isDefault": True}}}})
+                elif method == "Page.createIsolatedWorld":
+                    worlds.append(dict(params))
+                    identifier = 18 if params["frameId"] == "render" else 19
+                    await ws.send_json({"method": "Runtime.executionContextCreated", "sessionId": "owned",
+                        "params": {"context": {"id": identifier, "name": params["worldName"],
+                            "uniqueId": f"{identifier}-{state.world_generation}",
+                            "auxData": {"frameId": params["frameId"], "isDefault": False}}}})
+                    result = {"executionContextId": identifier}
                 elif method == "Runtime.addBinding":
                     bindings[params["name"]] = params["executionContextId"]
                 elif method == "Runtime.removeBinding":
@@ -92,11 +117,20 @@ async def portal_fixture():
                     if "MutationObserver" in expression:
                         observers.append(expression)
                         name = re.search(r"__wmpf_signal_[0-9a-f]+", expression).group()
-                        tasks.append(asyncio.create_task(signal_ready(name)))
+                        assert params["contextId"] in {18, 19}, "Observer ran outside its real rendering world"
+                        if state.destroy_during_observe:
+                            state.destroy_during_observe = False
+                            state.world_generation += 1
+                            await ws.send_json({"method": "Runtime.executionContextDestroyed", "sessionId": "owned",
+                                "params": {"executionContextId": params["contextId"]}})
+                            await ws.send_json({"id": packet["id"], "sessionId": "owned",
+                                "error": {"code": -32000, "message": "Cannot find context with specified id"}})
+                            continue
+                        tasks.append(asyncio.create_task(signal_ready(name, params["contextId"])))
                         registered.set()
                         result = {"result": {"value": {"watching": True}}}
                     elif "typeof document" in expression:
-                        result = {"result": {"value": {"dom": True, "eval": True, "wx": False}}}
+                        result = {"result": {"value": state.capabilities if params.get("contextId") != 19 or state.root_dom else {"dom": False}}}
                     elif expression.replace(" ", "") == "1+1":
                         result = {"result": {"value": 2}}
                     else:
@@ -119,10 +153,35 @@ async def portal_fixture():
     port = site._server.sockets[0].getsockname()[1]
     try:
         yield SimpleNamespace(port=port, registered=registered, release=release, removed=remove,
-                              observers=observers, sockets=sockets, received=received, state=state, closed=closed)
+                              observers=observers, sockets=sockets, received=received, packets=packets,
+                              worlds=worlds, state=state, closed=closed)
     finally:
         for ws in sockets: await ws.close()
         await runner.cleanup()
+
+
+@pytest.mark.anyio
+async def test_dom_readiness_uses_protocol_evaluation_without_global_eval():
+    async with portal_fixture() as f:
+        f.state.capabilities = {"dom": True, "eval": False, "wx": False}
+        task = asyncio.create_task(probe_page(f.port, "#business", None, 2))
+        await asyncio.wait_for(f.registered.wait(), 1)
+        assert not task.done()
+        f.release.set()
+        result = await task
+        assert result["passed"] and result["matched"]["context_id"] == 18
+        assert result["matched"]["world_name"] == _WORLD_NAME
+        assert len(f.observers) == 1 and len(f.removed) == 1 and f.sockets[0].closed
+
+
+@pytest.mark.anyio
+async def test_wx_context_without_dom_is_not_business_ready():
+    async with portal_fixture() as f:
+        f.state.capabilities = {"dom": False, "eval": False, "wx": True}
+        result = await probe_page(f.port, "#business", None, 0.1)
+        assert not result["passed"] and not f.registered.is_set() and not f.observers
+        assert "Runtime.addBinding" not in f.received
+        assert "Target.detachFromTarget" in f.received and f.sockets[0].closed
 
 
 @pytest.mark.anyio
@@ -131,8 +190,59 @@ async def test_foreign_isolated_worlds_do_not_starve_the_business_context():
         f.state.isolated_first = True
         f.release.set()
         result = await probe_page(f.port, "#business", "page-frame_100", 2)
-        assert result["passed"] and result["matched"]["context_id"] == 2
+        assert result["passed"] and result["matched"]["context_id"] == 18
         assert len(f.observers) == 1 and f.removed
+        assert f.worlds == [{"frameId": "render", "worldName": _WORLD_NAME}]
+
+
+@pytest.mark.anyio
+async def test_readiness_observes_its_own_world_without_touching_main_or_foreign_worlds():
+    async with portal_fixture() as f:
+        f.state.isolated_first = True
+        task = asyncio.create_task(probe_page(f.port, "canvas", None, 2))
+        await asyncio.wait_for(f.registered.wait(), 1)
+        assert not task.done()
+        f.release.set()
+        result = await task
+        assert result["passed"] and result["matched"]["context_id"] == 18
+        assert all(p["params"]["contextId"] in {18, 19} for p in f.packets
+                   if p["method"] == "Runtime.evaluate")
+        assert sorted(f.worlds, key=lambda w: w["frameId"]) == [
+            {"frameId": "page", "worldName": _WORLD_NAME},
+            {"frameId": "render", "worldName": _WORLD_NAME}]
+        assert len(f.observers) == len(f.removed) == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("frame_name, expected", [("", "page"), ("missing", None)])
+async def test_readiness_isolated_world_preserves_exact_frame_selection(frame_name, expected):
+    async with portal_fixture() as f:
+        result = await probe_page(f.port, "canvas", frame_name, 0.05)
+        assert not result["passed"] and not f.observers
+        assert f.worlds == ([] if expected is None else [{"frameId": expected, "worldName": _WORLD_NAME}])
+
+
+@pytest.mark.anyio
+async def test_observer_type_error_is_retained_without_becoming_invalid_css():
+    async with portal_fixture() as f:
+        f.state.observer_error = True
+        f.release.set()
+        result = await probe_page(f.port, "canvas", "page-frame_100", 0.1)
+        assert not result["passed"] and result.get("failure_kind") != "invalid_selector"
+        assert result["observer_errors"][0]["reason"] == "observer_error"
+        assert result["observer_errors"][0]["error"] == "TypeError: geometry unavailable"
+        assert f.removed and f.sockets[0].closed
+
+
+@pytest.mark.anyio
+async def test_one_world_observer_error_does_not_block_another_real_frame():
+    async with portal_fixture() as f:
+        f.state.root_dom = True
+        f.release.set()
+        result = await probe_page(f.port, "canvas", None, 2)
+        assert result["passed"] and result["matched"]["frame_id"] == "render"
+        assert result["observer_errors"][0]["frame_id"] == "page"
+        assert len(f.observers) == len(f.removed) == 2
 
 
 @pytest.mark.anyio
@@ -234,14 +344,26 @@ async def test_disconnect_during_loading_never_reports_ready():
 
 
 @pytest.mark.anyio
-async def test_old_context_binding_cannot_pass_after_context_recreation():
+@pytest.mark.parametrize("mode", [True, "destroy", "navigate"])
+async def test_old_context_binding_cannot_pass_after_context_recreation(mode):
     async with portal_fixture() as f:
-        f.state.reset = True
+        f.state.reset = mode
         task = asyncio.create_task(probe_page(f.port, "#business", None, 2))
         await f.registered.wait()
         f.release.set()
         result = await task
         assert result["passed"] and len(f.observers) == 2
+        assert len([w for w in f.worlds if w["frameId"] == "render"]) == 2
+
+
+@pytest.mark.anyio
+async def test_destroyed_world_rpc_error_does_not_abort_its_replacement():
+    async with portal_fixture() as f:
+        f.state.destroy_during_observe = True
+        f.release.set()
+        result = await probe_page(f.port, "canvas", "page-frame_100", 2)
+        assert result["passed"] and len(f.observers) == len(f.removed) == 2
+        assert len(f.worlds) == 2
 
 
 @pytest.mark.anyio
@@ -304,9 +426,38 @@ console.log('business visibility and observer cleanup OK');
     assert result.returncode == 0, result.stderr
 
 
+@pytest.mark.parametrize("location, name, reason", [
+    ("selector", "SyntaxError", "invalid_selector"),
+    ("selector", "TypeError", "observer_error"),
+    ("geometry", "TypeError", "observer_error"),
+    ("geometry", "SyntaxError", "observer_error"),
+])
+def test_observer_only_classifies_selector_syntax_errors_as_invalid_css(location, name, reason):
+    program = r'''
+const vm = require('node:vm');
+const [source, location, name, expected] = process.argv.slice(1).map(JSON.parse);
+const signals = [];
+let disconnected = false;
+const fail = () => { const error = new Error('test failure'); error.name = name; throw error; };
+const world = {
+  document: {readyState:'complete', querySelectorAll: location === 'selector' ? fail : () => [{getClientRects:fail}]},
+  MutationObserver: class {observe(){} disconnect(){disconnected=true}},
+  setTimeout:()=>1, clearTimeout(){}, addEventListener(){}, removeEventListener(){},
+  signal:value=>signals.push(JSON.parse(value))
+};
+world.window = world;
+vm.runInNewContext(source.replace('__ARGS__', JSON.stringify(['canvas','observer','signal',60000])), world);
+if(signals.length !== 1 || signals[0].ready || signals[0].reason !== expected || !disconnected || world.observer)
+  throw Error(JSON.stringify(signals));
+'''
+    result = subprocess.run(["node", "-e", program, *map(json.dumps, (_SCRIPT, location, name, reason))],
+                            text=True, capture_output=True, timeout=5)
+    assert result.returncode == 0, result.stderr
+
+
 @pytest.mark.anyio
 async def test_packaged_manual_matches_docs_and_is_exposed_to_mcp():
-    expected = (Path(__file__).parents[1] / "docs/08-执行流手册.md").read_text()
+    expected = (Path(__file__).parents[1] / "docs/08-执行流手册.md").read_text(encoding="utf-8")
     assert execution_manual() == expected
     server = build_server()
     assert MANUAL_URI in {str(resource.uri) for resource in await server.list_resources()}

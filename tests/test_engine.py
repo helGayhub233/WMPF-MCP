@@ -234,11 +234,16 @@ async def test_portal_browser_session_and_ledger():
 
             # A missing browser implementation must not look like successful
             # creation/storage access, and must not consume the attached page.
-            for index, method in enumerate(("Target.createTarget", "Browser.getWindowForTarget",
+            reply = await call({"id": 10, "method": "Target.createTarget",
+                                "params": {"url": "about:blank"}})
+            assert "result" not in reply and reply["error"]["code"] == -32000
+            assert "no independent tab was created" in reply["error"]["message"]
+            create_target_error = reply["error"]
+            for index, method in enumerate(("Browser.getWindowForTarget",
                                            "Storage.getCookies", "Schema.getDomains",
-                                           "Target.exposeDevToolsProtocol", "WMPF.nonexistent"), 10):
+                                           "Target.exposeDevToolsProtocol", "WMPF.nonexistent"), 11):
                 reply = await call({"id": index, "method": method, "params": {"url": "about:blank"}})
-                assert "result" not in reply and reply["error"]["code"] in (-32000, -32601)
+                assert "result" not in reply and reply["error"]["code"] == -32601
             reply = await call({"id": 20, "method": "Target.getTargets", "params": []})
             assert reply["error"]["code"] == -32602
             reply = await call({"id": 21, "sessionId": session_id,
@@ -249,6 +254,28 @@ async def test_portal_browser_session_and_ledger():
             reply = await call({"id": 23, "method": "Browser.setDownloadBehavior",
                                 "params": {"behavior": "default"}})
             assert reply["result"]["method"] == "Browser.setDownloadBehavior"
+
+            # Playwright's newBrowserCDPSession sends browser methods through
+            # this owned session rather than directly on the root transport.
+            reply = await call({"id": 24, "method": "Target.attachToBrowserTarget"})
+            browser_session_id = reply["result"]["sessionId"]
+            reply = await call({"id": 25, "sessionId": browser_session_id,
+                                "method": "Target.createTarget", "params": {"url": "about:blank"}})
+            assert "result" not in reply and reply["error"] == create_target_error
+            assert reply["sessionId"] == browser_session_id
+            reply = await call({"id": 26, "sessionId": browser_session_id,
+                                "method": "WMPF.nonexistent"})
+            assert "result" not in reply and reply["error"]["code"] == -32601
+            assert reply["sessionId"] == browser_session_id
+            reply = await call({"id": 27, "sessionId": session_id,
+                                "method": "Runtime.evaluate", "params": {"expression": "1+1"}})
+            assert reply["result"]["ok"] is True and reply["sessionId"] == session_id
+            reply = await call({"id": 28, "sessionId": browser_session_id,
+                                "method": "Target.getTargets"})
+            assert reply["sessionId"] == browser_session_id
+            assert [t["targetId"] for t in reply["result"]["targetInfos"]] == [
+                "webview-0", "appservice-0",
+            ]
             await ws.close()
 
         rows = portal.ledger.list()

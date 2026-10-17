@@ -290,7 +290,7 @@ def test_hook_refuses_arm64_fallback_on_x64():
     if not node:
         pytest.skip("Node.js unavailable")
     from wmpf_mcp.injector.manager import TEMPLATE_PATH
-    source = TEMPLATE_PATH.read_text().replace("@@CONFIG@@", '{"Arch":{"arm64":{"CDPFilterHookOffset":"0x100"}}}')
+    source = TEMPLATE_PATH.read_text(encoding="utf-8").replace("@@CONFIG@@", '{"Arch":{"arm64":{"CDPFilterHookOffset":"0x100"}}}')
     harness = """
 const vm=require('node:vm'), assert=require('node:assert/strict'), fs=require('node:fs');
 const messages=[];

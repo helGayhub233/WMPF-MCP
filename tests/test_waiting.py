@@ -202,7 +202,8 @@ async def native_hooks(monkeypatch, tmp_path):
         get_local_device=lambda: SimpleNamespace(attach=attach))
     manager._render_script = lambda _: "fixture"
     config = tmp_path / "offsets.json"
-    config.write_text("{}")
+    config.write_text(json.dumps({"Format": "Mach-O", "ABI": "darwin-arm64",
+                                  "Arch": {"arm64": {}}}), encoding="utf-8")
     get_state().config_path = str(config)
     rig.config = config
     monkeypatch.setattr(runtime, "_LIFECYCLE_LOCK", asyncio.Lock())

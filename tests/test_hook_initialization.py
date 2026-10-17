@@ -23,7 +23,7 @@ def test_template_installs_atomically_and_observes_the_callee(failure):
         'LoadStartHookOffset': '0x100', 'DebugConnectOffset': '0x200',
         'CDPFilterHookOffset': '0x300', 'ResourceCachePolicyHookOffset': '0x400',
         'DebugStartBlOffset': '0x500'}}}
-    source = TEMPLATE_PATH.read_text().replace('@@CONFIG@@', json.dumps(config))
+    source = TEMPLATE_PATH.read_text(encoding="utf-8").replace('@@CONFIG@@', json.dumps(config))
     harness = r'''
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict');
 const mode=process.argv[1],messages=[],listeners=[],events=[];

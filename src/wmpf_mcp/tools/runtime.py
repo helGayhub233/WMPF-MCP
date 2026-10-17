@@ -359,8 +359,8 @@ Raw 10000 has no browser discovery; standard clients use Portal 20000. An explic
 portal_port tests an existing local Portal without taking ownership. Page/Runtime
 domains are shared; only this probe's sockets, sessions and observers are released.
 page requires ready_selector identifying actual loaded business content, optionally
-frame_name. It waits for that CSS selector to be visible in a real DOM/eval context
-via MutationObserver/CDP binding events, not fixed sleeps, DOM counts or navigation text.
+frame_name. A named isolated world waits for CSS visibility in the real frame DOM.
+MutationObserver/CDP bindings drive the wait without sleeps or changes to page globals.
 Visible images in the business subtree and fonts must finish loading before ready.
 page has one fixed 60s deadline; observers/bindings/session are cleaned on every exit.
 Choose a business-loaded selector, then perform client screenshots/clicks; a visible
@@ -370,7 +370,7 @@ selector alone does not prove all resources or business actions succeeded.""")
         timeout_s: Annotated[float | None, Field(description="hooks/reconnect/raw/portal only: default 10s, at most 30s; raw internally at most 10s. Omit for page: fixed 60s plus at most 2s remote cleanup.", ge=0.1, le=30)] = None,
         portal_port: Annotated[int | None, Field(description="portal/page: existing loopback endpoint; omitted uses owned Portal or configured/default 20000.", ge=1, le=65535)] = None,
         ready_selector: Annotated[str | None, Field(description="page requires a CSS selector for actual business-loaded content, e.g. a loaded-state attribute; body or navigation presence is insufficient.", min_length=1, max_length=512)] = None,
-        frame_name: Annotated[str | None, Field(description="page only: exact observed rendering frame name. Omit to observe eligible default DOM/eval contexts.", max_length=256)] = None,
+        frame_name: Annotated[str | None, Field(description="page only: exact observed rendering frame name; empty string selects the unnamed root. Omit to observe real frame DOMs in an isolated world.", max_length=256)] = None,
         ctx: Context = None,
     ) -> ProbeReply | InputRequiredResult:
         arguments = dict(layer=layer, timeout_s=timeout_s, portal_port=portal_port,

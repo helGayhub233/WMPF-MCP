@@ -7,6 +7,7 @@ from pathlib import Path
 import plistlib
 import shutil
 import signal
+import sys
 import threading
 from types import SimpleNamespace
 
@@ -24,6 +25,8 @@ from wmpf_mcp.server import build_server
 
 @pytest.fixture
 def installation(monkeypatch, tmp_path):
+    if sys.platform == "win32":
+        pytest.skip("macOS maintenance fixture requires POSIX bundle symlinks")
     app = tmp_path / "WeChat with spaces.app"
     resolved = WeChatPaths(app, tmp_path / "radium")
     main = resolved.appex_bin
@@ -175,6 +178,8 @@ def test_explicit_force_resign_executes_signing_even_for_suitable_units(installa
 
 @pytest.fixture
 def process_stop(monkeypatch, tmp_path):
+    if sys.platform == "win32":
+        pytest.skip("macOS process-stop fixture requires kqueue and SIGKILL")
     root = tmp_path / "WeChat.app"
     main = str(root / "Contents/MacOS/WeChat")
     helper = str(root / "Contents/Helpers/Child.app/Contents/MacOS/Child")

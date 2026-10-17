@@ -13,6 +13,7 @@ from ..core.asyncio_utils import drain_task
 from .probe import CAPABILITIES
 
 _SCRIPT = Path(__file__).with_suffix(".js").read_text(encoding="utf-8")
+_WORLD_NAME = "wmpf-mcp-readiness"
 
 
 class _Client:
@@ -23,6 +24,7 @@ class _Client:
         self.bindings = {}
         self.contexts = {}
         self.generation = 0
+        self.frame_generations = {}
         self.changed = asyncio.Event()
         self.closed = False
         self.reader = asyncio.create_task(self.receive())
@@ -49,7 +51,11 @@ class _Client:
                     self.changed.set()
                 elif method == "Runtime.executionContextDestroyed":
                     context_id = params.get("executionContextId")
-                    self.contexts.pop(context_id, None)
+                    context = self.contexts.pop(context_id, {})
+                    frame_id = context.get("auxData", {}).get("frameId")
+                    if frame_id and (context.get("name") == _WORLD_NAME or
+                                     context.get("auxData", {}).get("isDefault") is True):
+                        self.frame_generations[frame_id] = self.frame_generations.get(frame_id, 0) + 1
                     for registered_id, future in self.bindings.values():
                         if registered_id == context_id and not future.done():
                             future.set_result({"ready": False, "reason": "context_destroyed"})
@@ -71,6 +77,10 @@ class _Client:
                 elif method == "Target.detachedFromTarget":
                     break
                 elif method in {"Page.frameAttached", "Page.frameNavigated", "Page.frameDetached"}:
+                    if method != "Page.frameAttached":
+                        frame_id = params.get("frame", {}).get("id") or params.get("frameId")
+                        if frame_id:
+                            self.frame_generations[frame_id] = self.frame_generations.get(frame_id, 0) + 1
                     self.changed.set()
         except Exception:
             # The consumer gets a structured disconnect, not an orphan reader error.
@@ -122,6 +132,8 @@ async def probe_page(port: int, selector: str, frame_name: str | None, timeout_s
     client = None
     attached = None
     jobs = {}
+    worlds = {}
+    identities = {}
     registrations = []
     deadline = asyncio.get_running_loop().time() + timeout_s
 
@@ -140,10 +152,10 @@ async def probe_page(port: int, selector: str, frame_name: str | None, timeout_s
             if result.get("exceptionDetails"):
                 raise ValueError("Readiness observer could not execute in this context")
             value = result.get("result", {}).get("value", {})
-            if value.get("reason") == "no_document":
-                return value
-            value = await future
-            return {**value, "context_id": context_id, "frame_id": frame["id"], "frame_name": frame.get("name", "")}
+            if value.get("reason") != "no_document":
+                value = await future
+            return {**value, "context_id": context_id, "frame_id": frame["id"],
+                    "frame_name": frame.get("name", ""), "world_name": _WORLD_NAME}
         finally:
             client.bindings.pop(binding, None)
             if not future.done():
@@ -203,27 +215,39 @@ async def probe_page(port: int, selector: str, frame_name: str | None, timeout_s
                 await client.rpc("Page.enable", session=attached)
                 await client.rpc("Runtime.enable", session=attached)
                 attempted = set()
+                examined = set()
                 while True:
                     client.changed.clear()
                     if client.closed:
                         raise ValueError("Runtime disconnected during business-resource loading")
                     frames = _frames((await client.rpc("Page.getFrameTree", session=attached)).get("frameTree", {}))
                     data["observed_frames"] = [{"id": f["id"], "name": f.get("name", "")} for f in frames.values()]
-                    candidates = [context for context in client.contexts.values()
-                                  if context.get("auxData", {}).get("isDefault") is not False]
-                    for context in candidates[:16]:
-                        identifier = (client.generation, context.get("uniqueId", context["id"]))
-                        if identifier in attempted:
-                            continue
-                        frame = frames.get(context.get("auxData", {}).get("frameId"))
-                        if not frame or (frame_name is not None and frame.get("name", "") != frame_name):
-                            continue
-                        attempted.add(identifier)
+                    candidates = [frame for frame in frames.values()
+                                  if frame_name is None or frame.get("name", "") == frame_name]
+                    for frame in candidates[:16]:
+                        identifier = (client.generation, frame["id"], client.frame_generations.get(frame["id"], 0))
                         try:
+                            if identifier not in attempted:
+                                attempted.add(identifier)
+                                result = await client.rpc("Page.createIsolatedWorld", {
+                                    "frameId": frame["id"], "worldName": _WORLD_NAME}, attached)
+                                context_id = result.get("executionContextId")
+                                if not isinstance(context_id, int):
+                                    raise ValueError("Readiness world did not return an execution context")
+                                worlds[identifier] = context_id
+                            context = client.contexts.get(worlds.get(identifier), {})
+                            if (identifier in examined or context.get("name") != _WORLD_NAME or
+                                    context.get("auxData", {}).get("frameId") != frame["id"]):
+                                continue
+                            examined.add(identifier)
                             result = await asyncio.wait_for(client.rpc("Runtime.evaluate", {
                                 "contextId": context["id"], "expression": CAPABILITIES, "returnByValue": True}, attached), 1)
                             capabilities = result.get("result", {}).get("value") or {}
-                            if capabilities.get("dom") and capabilities.get("eval"):
+                            current = client.contexts.get(context["id"], {})
+                            if (capabilities.get("dom") and identifier == (client.generation, frame["id"],
+                                    client.frame_generations.get(frame["id"], 0)) and
+                                    current.get("uniqueId", current.get("id")) == context.get("uniqueId", context["id"])):
+                                identities[identifier] = (context["id"], context.get("uniqueId", context["id"]))
                                 jobs[identifier] = asyncio.create_task(watch(context, frame))
                         except (ValueError, TimeoutError):
                             continue
@@ -235,17 +259,27 @@ async def probe_page(port: int, selector: str, frame_name: str | None, timeout_s
                             done, _ = await asyncio.wait([changed, *pending], return_when=asyncio.FIRST_COMPLETED)
                             completed = [task for task in done if task is not changed]
                         for task in completed:
-                            value = task.result()
                             identifier = next(key for key, job in jobs.items() if job is task)
-                            current = client.contexts.get(value.get("context_id"), {})
-                            still_current = identifier == (client.generation, current.get("uniqueId", current.get("id")))
-                            if value.get("ready") and still_current:
+                            frame_id = identifier[1]
+                            current = client.contexts.get(identities[identifier][0], {})
+                            still_current = (identifier == (client.generation, frame_id,
+                                client.frame_generations.get(frame_id, 0)) and
+                                frame_id in frames and identities[identifier] ==
+                                (current.get("id"), current.get("uniqueId", current.get("id"))))
+                            if not still_current:
+                                task.exception()  # A destroyed world's in-flight RPC may also have failed.
+                                del jobs[identifier]
+                                continue
+                            value = task.result()
+                            if value.get("ready"):
                                 data.update(passed=True, matched=value)
                                 data["checks"].append({"check": "business_selector_visible", "passed": True})
                                 return data
                             if value.get("reason") == "invalid_selector":
                                 data.update(failure_kind="invalid_selector", error=value.get("error"))
                                 return data
+                            if value.get("reason") == "observer_error":
+                                data.setdefault("observer_errors", []).append(value)
                             for identifier, job in list(jobs.items()):
                                 if job is task:
                                     del jobs[identifier]

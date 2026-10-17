@@ -223,8 +223,9 @@ class InjectorManager:
         return frida
 
     def _render_script(self, config_path: Path) -> str:
-        template = TEMPLATE_PATH.read_text(encoding="utf-8")
         config = json.loads(config_path.read_text(encoding="utf-8"))
+        template_path = TEMPLATE_PATH.with_name("windows.js") if config.get("Format") == "PE" else TEMPLATE_PATH
+        template = template_path.read_text(encoding="utf-8")
         # The template embeds the config inside a single-quoted JS string:
         # JSON.parse('@@CONFIG@@') — escape for that literal context.
         literal = (
