@@ -39,6 +39,16 @@ Hook readiness means each prepared PID acknowledged after all configured attachm
 and flush completed; script.load or another PID's armed does not prove this.
 Initialization awaits an event up to 5s within the native 30s deadline. Inspect
 last_start_failures and installed role/address summaries; partial failure blocks Q&A.
+On Windows, hook_pids selects every browser by actual scoped executable, full argv
+without --type, and a verified Weixin.exe/WeChat.exe parent in the configured app.
+Renderer/gpu-process/utility roles are explicitly excluded; missing or ambiguous
+metadata and unknown roles block preparation. Never select targets by attach/load
+success. All selected browsers must arm; utility armed is insufficient. running_pids,
+DLL discovery and maintenance still cover all scoped runtimes. OnLoadStart and
+SendToClientFilter have static flue/browser role evidence. Native Windows checks
+cover verified browser armed, reconnect, raw CDP, Portal and business-frame client
+operations. Full acceptance remains partial: native wx.request, complete HAR fields,
+six runtime replacements and remaining public MCP cancellation cases are unverified.
 DebugStartBlOffset is a caller reference, not an interception point: observe the
 callee entry and verify its return address. A relocation failure is not proof that
 signing is wrong; do not force-register/branch rewrites to hide an attach failure.
@@ -47,9 +57,11 @@ check_environment supplies P0 for a fresh dynamic workflow; static/scoped querie
 do not force a complete workflow.
 Resolve app/cache/home/workspace roots from client env; paths expand ~/$VAR/${VAR}
 without a shell. Stop at path_configuration errors before file/process changes.
-Read implementation_gaps on each platform: Windows PATH-04/05, Linux PATH-06 and
-their PATH-09 diagnostics remain unimplemented; resume these method branches on
-that system. Parser/shared-path tests never close native acceptance gaps.
+Read implementation_gaps on each platform. Windows PATH-04/05/09 and the PE x86_64
+win64-legacy analysis/hook backend are implemented; full Windows native dynamic
+acceptance remains pending. Windows paths have partial native coverage; Linux
+PATH-06/09 and other native ISAs remain unimplemented. Parser/shared-path tests
+never close native acceptance gaps. Windows does not use macOS signing actions.
 Startup failures before tools are available use wmpf-mcp doctor. Only manage_wechat
 changes app signatures/processes, with a verified full bundle backup and restoration.
 No package install or implicit sudo/elevation is performed. inspect_source is independent.

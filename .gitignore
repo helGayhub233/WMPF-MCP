@@ -44,8 +44,10 @@ mcp.json
 Thumbs.db
 
 # Local-only material (not part of the published package)
-/README.md
-/docs/
+/docs/*
+!/docs/08-执行流手册.md
+!/docs/10-Windows链路补齐与验收.md
+!/docs/审查清单.md
 /tmp/
 /scratch/
 *.har

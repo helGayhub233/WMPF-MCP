@@ -61,6 +61,7 @@ include = [
   "/mcp.json.example",
   "/pyproject.toml",
   "/scripts/audit_mcp_contracts.py",
+  "/scripts/windows_native_session.py",
   "/src",
   "/tests",
 ]

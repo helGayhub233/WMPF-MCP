@@ -3,6 +3,19 @@
 > v0.1.0 · 2026-10-17。动态目标按 P0–P7 推进，每阶段核对成功判据；已有健康资源从首个未满足条件续接。源码／二进制静态问题可独立执行。
 > MCP 初始化 instructions 摘要、资源 wmpf://manual/execution-flow、提示词 wechat_workflow 与本文件同步；安装 wheel 的客户端也能读取完整手册。
 > 当前 13 个工具：保留原 12 个，新增明确修改应用的 manage_wechat。只记住方法链，不维护版本兼容表或现场身份、证据模型。备份中的文件校验值仅用于还原完整性。
+>
+> Windows 本轮进度：当前真实 DLL 的 12 项静态复核通过；`applet_webview`／`webview` 两类已证明过滤调用点列表和精确 returnAddress guard 已实现。唯一已核验的目标 browser 实际 armed；修复后 Portal 六项检查及 context／frame 发现通过，raw 实测 `1+1=2`，Playwright 原生 CDP 读取真实页面正文并截图，agent-browser eval 返回 2。一次受控 WebView GET 的 HAR 正文为 887 字节，与接收端 SHA-256 一致；这些单项不替代整链验收。
+> 新会话复验：原生回连、raw 返回 2、Portal 六项检查通过。默认 Portal 20000–20003 被外部 PID 4 占用，服务正确拒绝接管；显式使用 20102 后启动成功。标准 Playwright 的 canvas count 和真实菜单点击成功，菜单可恢复关闭；agent-browser eval 返回 2。双客户端受控 WebView GET／POST／HEAD 均实际到达接收端，Playwright 中文 POST 为 62 字节；agent 首次 PowerShell stdin 编码成问号，保留错误记录，仅验收 harness 改为 UTF-8 OutputEncoding 后，65 字节中文 POST 正确，不计为产品缺陷。
+> 原生网络边界：实际小游戏逻辑 context 的公共 wx.getNetworkType 返回 wifi；公共 wx.request 的 fail 回调 Error.stack 定位到 SDK 第 593970 行的 Ee 任务状态回调，表明创建任务后失败。仍返回 `request:fail invalid url` 且未到接收端，不能宣称 wx 原生捕获通过。
+> 当前业务验收：固定名自有隔离世界修复已原生通过真实 canvas、图片与字体等待及 observer／binding 清理。京东真实业务 frame 的标准 Playwright Frame.evaluate 返回 2，正文／DOM、中文 fill、input.value 与 wx-input[value] 回读通过；agent-browser 输入、互读、清空和返回首页亦已交叉核对，MCP 精确业务 frame 的搜索／首页 selector 等待通过。小游戏默认 context 的 globalThis.eval／eval 为 undefined 是该页面的限制；agent-browser 0.39.1 的 eval 使用默认 realm，不能用其结果声称已求值所选业务 frame。
+> Portal C-04 已重载并通过原生复验：根连接及 browser CDPSession 的 Target.createTarget 均返回 -32000，未知方法返回 -32601；拒绝后原页 Runtime.evaluate 仍返回 2。
+> 历史失败窗口保留：跨 source 的 JSON／CBOR 整值浮点表示差异曾造成 redirect final 重复，首跳未知正文大小曾误记为 0；该旧窗口不计通过。指纹归一化与 HAR 重定向未知大小修正已回归并实际载入原生服务，随后完成二方校准。
+> 最终网络实证：r1／r2／r99 共六组客户端记录、44 条请求在接收端、MCP HAR 与真实连续 agent HAR 中均为 1:1:1，未见重复、缺失或已知字段不匹配；合计 616 match／302 unknown／4 truncated，整体仍为 incomplete。N02 r99 已实测 302→307→200 多跳及声明 4096 字节、实际仅写入 1024 字节后的受控断流；失败正文与前两跳未知正文没有改记为完整匹配。
+> 本轮止测边界：用户明确要求停止新增测试、避免过度测试。正式窗口为 3103.769081 秒（约 51 分 44 秒），仅完成 1 次实际重开；原“至少 30 分钟、6 次重开”规范矩阵保留，6 次未完成，不以 1 次替代或继续补做。本次按已执行范围收尾，不宣称原完整矩阵通过。
+> Windows M-01 当前实证：Term5 修正后真实 prepare 完成，主程序拉起、用户登录确认通过，files_modified=false；匹配 restore 成功且 already_original=true。两棵原目录及对应备份的生产 tree_digest 与记录一致，每侧 67 个文件、1250835600 字节。维护完成后的 legacy 登录 Q&A 选择取消，notification=cancelled，保留已完成操作；这不是维护执行中取消。
+> 历史维护失败保留：先前 force_stop 的 E_PERMISSION／WinError 5、已停 3 个范围内 PID 及完整备份记录不追改为成功；此前无 TTY 的 legacy 通知 EOF 为 harness 问题。后续成功不反推旧失败的具体 API 原因。
+> 取消覆盖：X03 在真实 attach／create_script／load 三个原生阶段内的普通 Task 取消、清理与重新 armed 已通过；未覆盖硬截止。公开 MCP 的 X01／X02／X04 及维护 M02 仍未覆盖，不用维护完成后的 Q&A 取消替代。
+> 现有证据为本地验收产物：`artifacts/continuous-term5-window-b.json`、`artifacts/har-three-way-term5-window-b-20261017-final.json`、`artifacts/native-mcp/maintenance-prepare-term5-native.json`、`artifacts/native-mcp/maintenance-restore-term5-cancel.json`、`artifacts/native-cancel-20261017-recovery-7884/summary.json`；不随仓库提交原始现场数据。
 
 ## 执行总览
 
@@ -11,7 +24,7 @@
 | P0 环境 | check_environment(goal="automation") | 所需包可导入，实际模块／ISA 可检查；版本未知允许继续分析 |
 | P1 准备微信 | manage_wechat(action="prepare") → 登录 Q&A → 用户确认后重做 P0 | 完整 .bak 已校验；仅强停配置应用目录内的进程；实际签名已验证；微信主程序拉起并交给用户手动登录，确认不替代实际运行体检 |
 | P2 参数 | check_offsets；未就绪才 prepare_offsets | 当前实际模块静态角色与调试链复核通过；不按版本猜偏移 |
-| P3 监听与 Hook | start_runtime(component="all")；必要时 probe_runtime(layer="hooks") | 先监听、后挂钩；各准备 PID 完整安装并最终 armed，任一失败阻断重开提示；awaiting_miniapp 是正常阶段 |
+| P3 监听与 Hook | start_runtime(component="all")；必要时 probe_runtime(layer="hooks") | 先监听、后挂钩；各目标 PID 完整安装并最终 armed，任一失败阻断重开提示；Windows 按下述 browser 角色选取全部目标；awaiting_miniapp 是正常阶段 |
 | P4 用户打开 | 执行交互中的 MCP Q&A 提示完整重开小程序；确认继续后 probe_runtime(layer="reconnect") | 当前 socket 与 setupContext；这只是传输就绪 |
 | P5 命令 | probe_runtime(layer="raw") | 固定 1+1 返回 2；之后仍须 frame／事件／客户端验收 |
 | P6 Portal 与业务 | start_runtime(component="portal") → probe_runtime(layer="portal") → probe_runtime(layer="page", ready_selector=...) | browser/session/frame/context 正常，并等到具体业务就绪条件；随后执行真实客户端动作 |
@@ -27,31 +40,34 @@ check_environment(goal="automation", scope="all")
 
 environment_ready 只表示预检。包需实际可导入；scope=packages/system/wechat 不宣称整体就绪。macOS 签名检查覆盖实际发现的主程序及 helper，逐项报告 ad-hoc／hardened runtime；签名状态是权限线索，实际 attach 才是验证。SIP 开启不意味着每台机器都须相同处理。
 
-端口 9421 是私有回连，10000 是单 runtime 裸 CDP，20000 是 browser-level Portal。外部占用不自动接管。Linux／Ubuntu／Windows 的格式查询或模拟测试不等于已实现原生 Hook 后端。
+端口 9421 是私有回连，10000 是单 runtime 裸 CDP，20000 是 browser-level Portal 默认值；客户端使用本次实际启动结果的地址。外部占用不自动接管。本轮 Windows 的默认 Portal 20000–20003 被外部 PID 4 占用时正确拒绝启动，明确改用 20102 后成功；不把该端口固化为后续默认值。Linux／Ubuntu／Windows 的格式查询或模拟测试不等于已实现原生 Hook 后端。
 
 ### 路径配置与未实现分支
 
 应用安装、radium 包缓存、本地参数／备份和源码工作目录分别读取 WMPF_MCP_WECHAT_APP、WMPF_MCP_RADIUM_DIR、WMPF_MCP_HOME、WMPF_MCP_WORKSPACE，不用项目启动目录代替安装目录。四个键及显式 module/config/backup 路径统一展开 ~、$VAR、${VAR}，不执行 shell；相对路径以服务当前目录为基准，符号链接归一为绝对目标。变量未定义／为空／循环或路径语法错误时先修正客户端 env；path_configuration 失败不进入文件写入、监听或微信维护。默认根目录、来源及告警见 check_environment.config/path_warnings。uv --directory 由客户端在启动前处理，填写真实绝对项目路径。
 
-macOS framework 优先跟随实际 executable／Versions/Current 和 bundle 元数据；没有选择器时仅接受唯一候选。缺失模块、多个未选择版本、坏链接及越界不猜路径，先修复安装／配置再继续。当前原生验收只覆盖 macOS arm64。
+macOS framework 优先跟随实际 executable／Versions/Current 和 bundle 元数据；没有选择器时仅接受唯一候选。缺失模块、多个未选择版本、坏链接及越界不猜路径，先修复安装／配置再继续。Windows 已实现路径发现、诊断、PE x86_64 参数提取／复核和 win64-legacy Hook；完整动态原生验收仍待完成，不能从这些单项结果推出整链成功。
 
 | 方法缺口 | 下次在对应环境执行的工作 | 当前状态 |
 | --- | --- | --- |
-| Windows PATH-04 | 应用与数据根分开定位；用真实 executable 路径核对进程范围，替换仅按名称 tasklist | 未实现、未做 Windows 真机验收 |
-| Windows PATH-05 | 将实际 flue.dll 传入体检及默认分析，不能用插件目录充当模块 | 未实现、未做 Windows 真机验收 |
+| Windows PATH-04 | 应用与插件／数据根分开定位；按真实 executable 与加载 DLL 限定进程 | 已实现，本机路径发现通过 |
+| Windows PATH-05 | 当前加载的 flue.dll 贯穿体检、提取、复核和注入；离线只接受唯一真实模块 | 已实现，本机模块／PE ISA 发现通过 |
 | Linux／Ubuntu PATH-06 | 接入配置的安装根、离线模块发现，核对运行 executable／module 范围；Ubuntu 属于发行版维度 | 未实现、未做 Linux 真机验收 |
-| Windows／Linux PATH-09 | 实现各自的端口和系统代理诊断；当前明确返回 unknown，不能推导端口空闲或代理关闭 | 未实现、待对应系统开发及验收 |
-| Windows／Linux PATH-07、PATH-08 | 用实际缓存布局、宿主环境继承及原生路径形态验收共享解析器；Windows 盘符／UNC 尚未实测 | 共享实现存在，待本系统原生验收 |
-| 非 Mach-O arm64 动态链 | 分析当前格式／ISA／ABI 并实现 Hook／提取后端；Windows／Linux 还缺应用维护后端，之后分别做原生验收 | 未实现；PE／ELF／共享解析器样本不替代原生支持 |
+| Windows PATH-09／Linux PATH-09 | Windows 观察真实监听 PID 的归属及 env／WinINET／WinHTTP 代理来源，查询失败保留 unknown | Windows 已实现并验证 owned／external／free；Linux 待实现 |
+| Windows／Linux PATH-07、PATH-08 | Windows 实测本地盘符、中文空格、缓存、变量和子进程继承；UNC／跨盘／符号链接仍未验 | Windows 部分通过；Linux 待原生验收 |
+| Windows PE x86_64 动态链 | 从 PE unwind 边界、字符串与调用／参数数据流提取并复核 win64-legacy 角色；独立 Windows Hook | 12 项静态复核、browser armed、raw／Portal／C-04、京东业务帧和隔离世界等待通过；网络修正已真载入，44 条三方 1:1:1，616 match／302 unknown／4 truncated，仍 incomplete。窗口 3103.769081 秒／1 次重开，用户止测，原 6 次矩阵未完成；X03 普通取消和 M-01 已执行分支通过，N05 与公开 MCP X01／X02／X04、M02 未覆盖 |
+| 其他 ISA／平台 | macOS x86_64、Windows ARM64／x86_32、Linux 动态后端需独立分析 | 未实现；格式解析器不替代原生支持 |
 
 check_environment.implementation_gaps 随当前平台返回上述方法缺口编号。只记住缺失的方法分支，不保存版本表、机器身份或长期现场证据；后续运行不可把本机回归记录当成其他系统的通过结论。
 
-## P1 · 解签名、精确强停、重新拉起与 .bak 还原
+## P1 · 应用维护、精确强停、重新拉起与 .bak 还原
 
 ~~~python
 manage_wechat(action="prepare", dry_run=True)  # 可先查看实际范围
 manage_wechat(action="prepare")                # 执行准备；会中断当前微信及小程序
 ~~~
+
+以下签名与 bundle 操作适用于 macOS。Windows 不执行 ad-hoc 签名、不移除厂商签名；Windows 维护实现和验收状态以 implementation_gaps 为准。已有可用登录状态时可手动启动／登录先验 P2–P7，不能因此关闭独立维护验收。
 
 执行 prepare 时先释放本 MCP 的资源，复制并校验完整 WeChatAppEx.app.bak，保存目录到 backup_path。备份包含整个 runtime bundle，使用 ditto 保留资源叉、扩展属性和 ACL。校验完成后，按内核实际 executable 路径选择配置的 WeChat.app 目录内进程，使用临时父子关系优先停止父进程；每次 SIGKILL 前重新核对路径、先订阅退出事件。退出事件到达后重新检查并收束期间新生的应用内进程，整个强停共用 10 秒截止，不 sleep 轮询，也不把新子进程直接当作维护失败。持续再生或无法退出才报超时，文件操作不会继续。
 
@@ -79,7 +95,9 @@ prepare_offsets(source="extract")  # 只在当前参数未通过时
 prepare_offsets(source="import", candidate_path="/path/to/checked.json")
 ~~~
 
-沿实际格式／ISA → 字符串 → xref／数据流 → Hook 角色 → 当前模块复核推进。版本号仅是可选标签，未知不阻塞分析。提取失败读 methodology／branch_guidance；无法证明的字段不猜测。缺少完整必需角色时不进入动态注入。
+沿实际格式／ISA → 字符串 → xref／数据流 → Hook 角色 → 当前模块复核推进。Windows 仅接受 PE x86_64／win64-legacy：从 .pdata 函数边界和 RIP 相对引用证明 OnLoadStart、scene 调试条件及 filter caller／callee。Win64 解析函数 args[0] 是输出槽、args[1] 是正文、args[2] 是 64 位长度，返回值解引用后才是 variant；禁止套用 Darwin 布局。版本号仅是可选标签，未知不阻塞分析。提取失败读 methodology／branch_guidance；无法证明的字段不猜测。缺少完整必需角色时不进入动态注入。
+
+Windows 的 `FilterCallSites` 只收录分别证明的 `applet_webview` 与 `webview` 调用点。每项都须沿各自源文件引用、函数边界、输入 span、输出槽、tag 和返回 ABI 复核；Hook 在被调函数入口用该 call 的实际下一条指令地址精确比对 `returnAddress`，只接受已证明的列表成员。不能固定套用 call+5，也不能接受任意 caller；worker 与无角色证据的调用点仍不启用。
 
 ## P3–P4 · 就绪后提示用户打开
 
@@ -90,6 +108,12 @@ probe_runtime(layer="reconnect", timeout_s=10)      # 完整打开一次后有�
 ~~~
 
 `script.load()` 返回不证明 Hook 初始化成功。模板完成所有配置项的 attach／flush 后才发送最终 armed；每个 PID 按初始化事件等待最多 5 秒，包含在原生阶段总计 30 秒截止内。安装异常按角色、偏移、地址和实际指令报告，回滚已装 Hook，失败 PID 不提交；部分 PID 成功仍使本次准备失败，成功会话继续归本 MCP 所有。`inspect_runtime` 提供会话 initialization／installed_hooks、last_start_failures；后者是最近一次准备的失败，不是当前进程存活证明，下一次准备按真实 PID 重新核对。停止会清除此准备失败状态，错误摘要仍保留。纯事件等待可被取消唤醒，不要求 sleep 轮询。
+
+Windows 的 OnLoadStart／SendToClientFilter 静态调用链来自 flue/browser。`Win32Adapter.hook_pids()` 在真实 executable 范围内核对路径、完整 argv 与父进程：没有 `--type`，且真实父进程为配置安装根内的 Weixin.exe／WeChat.exe，才作为 browser 目标；选中所有满足条件的 browser。renderer／gpu-process／utility 按已核验 argv 显式列为 excluded。路径、argv、父进程元数据缺失或歧义，以及未知角色均阻断准备，不能按 attach／load 成败筛掉 PID。`running_pids()`、实际 DLL 发现和维护继续覆盖安装范围内全部 runtime，不因 Hook 角色选择而缩小。所有目标 browser 都必须完整 armed，utility armed 不能替代 browser 就绪。
+
+本轮 Windows 原生初试为部分失败：12 个 runtime 中发现 1 个 browser（PID 52008）、2 个 utility、8 个 renderer 和 1 个 GPU；2 个 utility armed，8 个 renderer 与 1 个 GPU 拒绝脚本 load。这些初试结果不证明 browser 或整链成功。后续按已核验角色筛选，唯一目标 browser 实际 armed，raw 实测 `1+1=2`；Playwright 通过原生 CDP 读取真实“羊了个羊”页面正文并截图，agent-browser eval 返回 2。
+
+先前 Portal context 发现失败的原因已通过静态与原生观察定位：旧 guard 仅覆盖 `applet_webview`，而当前目标的 `Runtime.executionContextCreated` 与 `Network.requestWillBeSent` 经 `webview` 调用点，事件未进入转发链。已将分别证明的两个调用点纳入精确 returnAddress 列表；修复后 Portal 六项检查及 context／frame 发现通过，一次受控 WebView GET 的 HAR 正文 887 字节与接收端 SHA-256 一致。固定名自有隔离世界的真实 canvas 业务等待已原生通过；后续窗口为 3103.769081 秒／1 次实际重开，44 条三方记录 1:1:1，未知和截断仍保留为 incomplete。原生 wx.request 未通过，原 6 次重开矩阵未完成；用户已止测，本轮不再追加用例。之后每次仍须重新核对所有目标 browser 均 armed；本轮单 browser 结果不替代多 browser 覆盖。本段只记录本轮结果，不建立 PID、版本偏移或机器身份档案。
 
 DebugStartBlOffset 保留为静态调用关系及返回地址参照，不直接在 BL 指令挂钩。ARM64 该位置的在线重定位只能使用 4 字节近跳转，合法指令／静态检查通过仍可能缺少附近跳板；从 DebugConnectOffset 的函数入口观察，并用 returnAddress=BL+4 核对发起方。遇到 unable to intercept function，先区分具体角色和 Frida 错误语义，再查实际指令／已有插桩／重定位条件，不默认重签、不强制寄存器／分支或忽略重定位检查。历史进程已退出时，明确不能复查当时的地址布局。
 
@@ -116,9 +140,9 @@ probe_runtime(layer="page", ready_selector=".business-content[data-loaded='true'
               frame_name="实际观察到的渲染帧名称")
 ~~~
 
-ready_selector 是示例，必须换成该小程序实际业务就绪元素或加载状态属性。不得以 body、导航栏、DOM 节点数、setupContext 或截图文件存在代替业务加载完成。frame_name 可省略，由探针观察实际 DOM/eval default contexts；需要限定页面时传真实 frame 名称。
+ready_selector 是示例，必须换成该小程序实际业务就绪元素或加载状态属性。不得以 body、导航栏、DOM 节点数、setupContext 或截图文件存在代替业务加载完成。frame_name 可省略，由探针枚举实际 frame 并观察各自的固定名自有隔离世界；需要限定页面时传真实 frame 名称。观察脚本通过原生 Runtime.evaluate 执行，不要求页面全局 eval 存在；能力报告中的 eval 仍用于诊断标准客户端兼容性，不能据此宣称 Playwright 的 Page/Frame.evaluate 已通过。
 
-page 层通过 MutationObserver、尺寸／DOM 事件和独立 CDP binding 等待 CSS 条件可见，并直接监听业务区域内可见图片的 load/error、等待字体就绪。page 只设固定 60 秒这一档，就绪事件到达即可提前结束，不传 timeout_s；其他探针默认 10 秒、最多 30 秒；不固定 sleep，也不靠重复 inspect_runtime。纯业务等待不占住一条长期未回包的 CDP 命令。超时 E_PAGE_NOT_READY；先核对业务条件、当前帧及加载状态。结束清理自有 observer、图片监听、binding、session 和 socket，远端清理最多另用 2 秒。图片加载失败单独警告；该条件不保证全部后台资源成功。客户端需给长等待配置足够的请求超时。
+page 层在所选实际 frame 的自有固定名 isolated world 中，通过 MutationObserver、尺寸／DOM 事件和独立 CDP binding 等待 CSS 条件可见，并直接监听业务区域内可见图片的 load/error、等待字体就绪。主世界可能返回包装对象，不能把缺少 DOM 能力误判为 selector 未就绪；不修改主世界的 eval 或 DOM。该隔离世界修复已过 35 项回归及真实可见 canvas 等待，结束后的自有 observer／binding 检查已清空。page 只设固定 60 秒这一档，就绪事件到达即可提前结束，不传 timeout_s；其他探针默认 10 秒、最多 30 秒；不固定 sleep，也不靠重复 inspect_runtime。纯业务等待不占住一条长期未回包的 CDP 命令。超时 E_PAGE_NOT_READY；先核对业务条件、当前帧及加载状态，能力缺失／脚本异常按各自错误分类报告。结束清理自有 observer、图片监听、binding、session 和 socket，远端清理最多另用 2 秒。图片加载失败单独警告；该条件不保证全部后台资源成功。客户端需给长等待配置足够的请求超时。
 
 业务条件通过后，再连接 agent-browser／Playwright，在实际渲染帧定位、快照、截图、点击，并验证可见结果。frame 名称只用于选择，不按虚拟 target 名称断言业务隔离。业务条件可见只证明该条件，不代表所有后台资源、原生网络或业务流程都完成。
 

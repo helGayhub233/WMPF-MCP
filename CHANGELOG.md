@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add a Windows PE x86_64 native backend with actual loaded-module and ISA discovery, static hook-role/ABI checks, and preparation of every verified browser process.
+- Support Windows application maintenance with complete installation/runtime backups, executable-scoped process stopping, host relaunch and checksum-matched restoration. Windows maintenance does not run macOS signing operations.
+- Provide an opt-in Windows MCP HTTP launcher and document the native workflow, demonstrated coverage and remaining acceptance cases.
+
+### Fixed
+
+- Install native hooks atomically, wait for per-PID armed acknowledgements, and drain in-flight native operations before cancellation cleanup.
+- Pin and validate each batch of Windows process handles before stopping processes; preserve native error details and distinguish successful termination from same-handle proof of an independently completed exit.
+- Wait for business readiness in an isolated world and preserve standard-client recovery after unsupported browser operations.
+- Deduplicate equivalent JSON/CBOR integral numbers without modifying delivered payloads, and report unavailable redirect-hop body sizes as unknown.
+- Diagnose Windows listeners and proxy sources separately, preserving unknown results when native queries fail.
+
+### Windows verification and remaining limits
+
+- Existing Windows regression: 419 passed, 42 skipped, exactly 5 SDK subprocess cases deselected after independently reproducing the runner's overlapped-pipe access error; 23 subtests passed. Wheel/sdist and an isolated installation matched all 74 package source/resource files at that tested snapshot.
+- Native PE checks, verified browser hooks, reconnect, raw CDP, Portal, Playwright/agent-browser business operations, ordinary Frida attach/create_script/load cancellation, prepare/login and matching already-original restore passed.
+- A 51-minute-43-second capture covered one actual runtime replacement. Its 44 scoped requests correspond one-to-one across receiver, MCP HAR and agent HAR without comparable-field conflicts. Unknown fields and four truncated body results keep full HAR acceptance incomplete.
+- The user ended further testing at this coverage. The original six replacements, native wx.request success/capture, remaining public MCP cancellation and UNC/cross-volume/symlink cases are unverified. Native wx.request still reports invalid url before reaching the receiver. These results do not claim full Windows acceptance or other native ISAs.
+
 ## 0.1.0 (2026-10-17)
 
 Initial consolidated local release. The existing implementation and development-stage changes are included in this release; previous internal version headings are consolidated below.
