@@ -17,6 +17,7 @@ from ..core.paths import offsets_file
 from ..core.state import Stage, get_state
 from ..injector import get_injector
 from ..platform import get_adapter
+from ..platform.capabilities import hook_backend_supported
 from ..offsets.service import static_checks
 from ..offsets.methodology import branch_guidance
 
@@ -45,12 +46,6 @@ async def execute(
                     "No offset config in session to render the hook from.",
                     remedy='Run check_offsets() or action="extract".',
                 )
-            if adapter.platform != "darwin":
-                raise ToolError(
-                    ErrorCode.UNSUPPORTED_ANALYSIS, "The current hook backend implements Darwin arm64 only.",
-                    remedy="Continue format/ISA and ABI analysis; another platform must establish its own module and hook behavior.",
-                    remedy_detail=branch_guidance("format"),
-                )
             binary = getattr(adapter, "main_module_path", lambda: None)()
             if not binary:
                 raise ToolError(ErrorCode.NO_WECHAT, "No installed runtime module to recheck.",
@@ -59,13 +54,24 @@ async def execute(
                 config = json.loads(Path(config_path).read_text(encoding="utf-8"))
             except (OSError, ValueError) as error:
                 raise ToolError(ErrorCode.OFFSETS_VERIFY_FAILED, str(error)) from error
+            binary_format = config.get("Format", "Mach-O")
+            arches = config.get("Arch", {})
+            if not isinstance(arches, dict) or not any(
+                hook_backend_supported(adapter.platform, binary_format, arch, config.get("ABI"))
+                for arch in arches
+            ):
+                raise ToolError(
+                    ErrorCode.UNSUPPORTED_ANALYSIS, "No native hook backend matches this platform, format, ISA and ABI.",
+                    remedy="Extract and verify the current module's own supported configuration before attaching.",
+                    remedy_detail=branch_guidance("format", str(binary)),
+                )
             checks = await asyncio.to_thread(static_checks, Path(binary), config)
             if not checks or not all(c["ok"] for c in checks):
                 raise ToolError(
                     ErrorCode.OFFSETS_VERIFY_FAILED, "Current module does not satisfy the hook parameter checks.",
                     remedy_detail={"checks": checks, **branch_guidance("verify", binary)},
                 )
-            pids = adapter.running_pids()
+            pids = await asyncio.to_thread(getattr(adapter, "hook_pids", adapter.running_pids))
             if not pids:
                 raise ToolError(
                     ErrorCode.WECHAT_NOT_RUNNING,
@@ -77,6 +83,8 @@ async def execute(
             if force:
                 await injector.stop()
             result = await injector.start(Path(config_path), pids)
+            if hasattr(adapter, "hook_scope"):
+                result["process_scope"] = adapter.hook_scope
             state.injected_pids = [
                 item["pid"] for item in result["injected"] if item.get("ok")
             ]

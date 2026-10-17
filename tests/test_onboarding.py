@@ -92,7 +92,7 @@ def test_version_requirement_and_optional_dependencies_have_separate_effects(mon
 
 def test_unknown_macos_policy_does_not_infer_root_requirement(monkeypatch):
     from wmpf_mcp.platform import darwin
-    monkeypatch.setattr(darwin.os, "geteuid", lambda: 501)
+    monkeypatch.setattr(darwin.os, "geteuid", lambda: 501, raising=False)
     monkeypatch.setattr(darwin.DarwinAdapter, "_sip_status", lambda _: "unknown")
     monkeypatch.setattr(darwin, "_run", lambda _: SimpleNamespace(returncode=1, stdout="", stderr=""))
     result = darwin.DarwinAdapter().signature_state()

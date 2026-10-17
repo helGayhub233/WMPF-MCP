@@ -17,10 +17,10 @@ METHODOLOGY = "\n".join(f"{i}. {step}" for i, step in enumerate(METHOD_CHAIN, 1)
 
 _BRANCHES = {
     "format": (
-        "The binary format/ISA can be inspected, but the current automatic hook extractor is Mach-O arm64.",
+        "Automatic extractors support Mach-O arm64 and PE x86_64 win64-legacy; other format/ISA/ABI combinations need their own role proof.",
         ["Use summary and strings to identify relevant code, then bounded xrefs/disasm/calls for the observed ISA.",
          "Establish module discovery, calling convention, string layout and filter return layout separately.",
-         "An ELF/PE reader does not implement a Linux/Windows injection backend."],
+         "A format reader alone does not implement a native injection backend; require a matching verified ABI."],
         "Stop automatic extraction at the missing backend; continue read-only analysis or the independent source track.",
         "SendToClientFilter",
     ),

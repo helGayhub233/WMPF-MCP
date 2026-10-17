@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from importlib import import_module
 from pathlib import Path
 
 from ..core.errors import ErrorCode, ToolError
+from ..platform.capabilities import analysis_module
 from .inspection import BinaryView
 from .methodology import METHOD_CHAIN, branch_guidance
 
@@ -18,7 +20,8 @@ def analysis_backend(binary: Path, arch: str | None = None):
         raise ToolError(ErrorCode.PARAM, str(error),
                         remedy="Select a local runtime module, not an application directory.",
                         remedy_detail=branch_guidance("unknown", str(binary))) from error
-    if fmt != "Mach-O" or selected != "arm64":
+    supported_module = analysis_module(fmt, selected)
+    if supported_module is None:
         guidance = branch_guidance("format", str(binary))
         raise ToolError(
             ErrorCode.UNSUPPORTED_ANALYSIS,
@@ -27,7 +30,7 @@ def analysis_backend(binary: Path, arch: str | None = None):
             remedy_detail={"format": fmt, "arch": selected, "method_chain": METHOD_CHAIN, **guidance},
         )
     try:
-        from . import extractor
+        extractor = import_module("." + supported_module, package=__package__)
     except ImportError as error:
         raise ToolError(
             ErrorCode.DEPS_MISSING, f"Optional extraction dependency unavailable: {error.name}.",

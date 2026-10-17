@@ -22,6 +22,7 @@ from ..core.syscheck import port_state, proxy_state
 from ..diagnostics import dependency_report
 from ..offsets.inspection import inspect_binary
 from ..platform import get_adapter
+from ..platform.capabilities import hook_backend_supported
 from ..platform.gaps import implementation_gaps
 from .contracts import annotations
 
@@ -105,10 +106,10 @@ def collect_environment(goal: str, scope: str = "all", binary_path: str | None =
             if module and Path(module).is_file():
                 summary = inspect_binary(Path(module), view="summary")
                 data["binary"] = summary
-                implemented = adapter.platform == "darwin" and summary.get("arch") == "arm64" and summary.get("format") == "Mach-O"
+                implemented = hook_backend_supported(adapter.platform, summary.get("format"), summary.get("arch"))
                 data["hook_backend_implemented"] = implemented
                 check("hook_backend", "pass" if implemented else "fail",
-                      "Current native backend: Darwin Mach-O arm64; parser support does not establish another hook ABI.", dynamic and not implemented)
+                      "Implemented native backends: Darwin Mach-O arm64 and Windows PE x86_64 win64-legacy; live readiness still requires current-module static checks and real attach.", dynamic and not implemented)
                 state = get_state()
                 state.platform, state.arch = info.platform, summary.get("arch")
                 state.wechat_path, state.runtime_path = info.app_path, info.runtime_path

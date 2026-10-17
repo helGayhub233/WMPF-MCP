@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 
 import pytest
 
@@ -74,6 +75,7 @@ async def test_portal_requires_live_connection():
 
 
 @pytest.mark.anyio
+@pytest.mark.skipif(sys.platform != "darwin", reason="Live automatic extractor roundtrip requires Mach-O arm64")
 async def test_offsets_extract_and_verify_roundtrip():
     server = build_server()
     locate = _payload(await server.call_tool('check_environment', {'scope': 'wechat'}))
@@ -209,6 +211,7 @@ async def test_path_config_env_override(monkeypatch, tmp_path):
 
     fake_app = tmp_path / "WeChat.app"
     monkeypatch.setenv("WMPF_MCP_WECHAT_APP", str(fake_app))
+    monkeypatch.setenv("WMPF_MCP_RADIUM_DIR", str(tmp_path / "radium"))
 
     paths = resolve_wechat_paths()
     assert paths.sources["WECHAT_APP"] == "env"

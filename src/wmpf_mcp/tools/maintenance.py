@@ -17,27 +17,29 @@ from ..core.schemas import MaintenanceReply
 from ..core.state import get_state
 from ..platform import get_adapter
 from ..platform.maintenance import Maintenance, run_maintenance
+from ..platform.windows_maintenance import WindowsMaintenance
 from .contracts import annotations
 
 
 def register(server: MCPServer):
-    @server.tool(name="manage_wechat", annotations=annotations(destructive=True, idempotent=False), description="""Maintain configured macOS WeChat (manual P1): prepare, restart, restore or launch.
-prepare verifies a full runtime .bak, then stops only in-app kernel executable paths.
-Parents stop first; exit events drain new children under one deadline. It signs
-main/helpers ad-hoc without hardened runtime and verifies; suitable units are reused
-unless force_resign. restore needs matching backup_path/checksums and refuses updates.
-ditto preserves bundle metadata. restart stops/relaunches; launch only opens WeChat.
-Nested sandbox-inheriting runtimes are not opened alone.
-After launch, MCP form Q&A asks for manual login. Continue suggests check_environment;
-cancel ends flow, keeping completed maintenance. Q&A continuation never repeats writes
-or restart. Unsupported clients get a login hint. Login is not runtime/Hook/page readiness.
-Owned MCP resources stop first; failure/cancellation settles children, rollback/relaunch.
-dry_run inspects without changes. Needs filesystem/process permissions; no sudo/install.""")
+    @server.tool(name="manage_wechat", annotations=annotations(destructive=True, idempotent=False), description="""Maintain configured macOS/Windows WeChat (P1): prepare, restart, restore or launch.
+prepare verifies a full .bak before executable-scoped stop; parents first, new children
+drained under one deadline. macOS signs ad-hoc; suitable units are reused unless force_resign.
+Windows snapshots app/runtime, preserves vendor files/signatures, checks filesystem
+access and rejects force_resign. Matching restore verifies already_original; updates refused.
+restore requires matching backup_path/checksums; macOS ditto preserves bundle metadata.
+restart stops/relaunches; launch opens only the main program, never a nested runtime alone.
+After launch, Form Q&A requests manual login. Continue suggests check_environment;
+cancel ends flow and keeps completed maintenance. Continuation never repeats writes/restart.
+Unsupported clients get a hint. Login does not prove runtime/Hook/page readiness.
+Owned resources stop first. Cancellation drains native work; backups remain. macOS mutation
+failure rolls back/relaunches; Windows stop failure blocks launch. dry_run only inspects.
+Needs filesystem/process permissions; no sudo/install.""")
     async def manage_wechat(
-        action: Annotated[Literal["prepare", "restart", "restore", "launch"], Field(description="prepare backs up/signs/restarts; restart force-restarts; restore reinstalls a matching backup; launch does not kill.")],
+        action: Annotated[Literal["prepare", "restart", "restore", "launch"], Field(description="prepare backs up/restarts and signs on macOS only; restart force-restarts; restore validates a matching snapshot (Windows already_original); launch does not kill.")],
         backup_path: Annotated[str | None, Field(description="restore only: backup directory returned by prepare, containing .bak and restore.json.")] = None,
         dry_run: Annotated[bool, Field(description="Inspect exact paths, signatures, processes and planned operations without changing files/processes.")] = False,
-        force_resign: Annotated[bool, Field(description="prepare only: re-sign all discovered units even if already suitable; default reuses suitable signatures.")] = False,
+        force_resign: Annotated[bool, Field(description="macOS prepare only: re-sign even suitable units; unsupported on Windows, which preserves vendor signatures.")] = False,
         ctx: Context = None,
     ) -> MaintenanceReply | InputRequiredResult:
         from . import runtime
@@ -51,18 +53,18 @@ dry_run inspects without changes. Needs filesystem/process permissions; no sudo/
         if force_resign and action != "prepare":
             return envelope.fail(ToolError(ErrorCode.PARAM, "force_resign applies only to prepare"), stage=state.stage.value)
         adapter = get_adapter()
-        if adapter.platform != "darwin":
+        if adapter.platform not in {"darwin", "win32"}:
             return envelope.fail(ToolError(ErrorCode.UNSUPPORTED_ANALYSIS,
-                "Application maintenance currently implements macOS only; no other platform was changed."), stage=state.stage.value)
-        worker = Maintenance(adapter)
+                "Application maintenance currently implements macOS and Windows only."), stage=state.stage.value)
+        worker = WindowsMaintenance(adapter) if adapter.platform == "win32" else Maintenance(adapter)
 
         async def operate():
             try:
                 data = await run_maintenance(worker, action, backup_path, True, force_resign=force_resign)
                 if not dry_run:
                     if action in {"prepare", "restore"} and not data.get("writable"):
-                        raise ToolError(ErrorCode.PERMISSION, "The current account cannot modify this runtime bundle",
-                                        remedy="Resolve application filesystem access before maintenance; no sudo is executed.")
+                        raise ToolError(ErrorCode.PERMISSION, "The current account cannot access this installation or its backup location",
+                                        remedy="Resolve the reported filesystem permissions before maintenance; no sudo is executed.")
                     stopped = await runtime.stop_owned("all")
                     if not stopped.structured_content["ok"]:
                         return stopped

@@ -60,7 +60,7 @@ failed roles, prepare_offsets to write checked parameters, inspect_runtime for l
     @server.tool(name="prepare_offsets", annotations=annotations(destructive=True), description="""Extract or import hook parameters and write them only after static verification.
 Use extract when the implemented binary/ABI role predicates apply; import accepts a
 local candidate already derived through analysis. Currently automatic extraction and
-verification implement Mach-O arm64. Other formats/ISAs return a focused inspect_binary
+verification implement Mach-O arm64 and PE x86_64 win64-legacy. Other formats/ISAs return a focused inspect_binary
 branch. No fallback to another ISA or old build's offsets. force permits replacement
 after checks, never bypasses validation. Existing files are preserved by default.
 This writes local parameters and selects them in memory, without attaching or installing
